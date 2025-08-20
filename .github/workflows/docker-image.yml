@@ -1,86 +1,137 @@
-name: Build and Push Multiple Docker Images
+name: Build and push container on new Predbat release
 
 on:
-  push:
-    paths:
-      - 'predbat_version.txt'   # Trigger only when this file changes
+  schedule:
+    - cron: '0 0 * * *'  # Runs every day at midnight UTC
+  workflow_dispatch:
+
+permissions:
+  contents: write     # needed for committing version bump + creating a release
+  packages: write     # needed for pushing to GHCR
 
 jobs:
-  build-multi-images:
+  check-and-update:
+    name: Check Predbat release
     runs-on: ubuntu-latest
 
-    env:
-      # replaced with verion file VERSION: v8.18.0
-      USER: ${{ secrets.DOCKERHUB_USERNAME }}
-
     steps:
-      - name: Checkout code
+      - name: Checkout your repo
         uses: actions/checkout@v4
 
-      - name: Read version
-        id: predbat_version
+      - name: Get latest release tag from upstream Predbat repo
+        id: get_latest
         run: |
-          PREDBAT_VERSION=$(cat predbat_version.txt)
-          echo "PREDBAT_VERSION=$PREDBAT_VERSION" >> $GITHUB_ENV
+          latest=$(curl -s https://api.github.com/repos/springfall2008/batpred/releases/latest | jq -r .tag_name)
+          echo "Latest predbat release: $latest"
+          echo "predbat_version=$latest" >> "$GITHUB_OUTPUT"
+
+      - name: Extract current version in this repo
+        id: get_current
+        run: |
+          current=$(cat predbat_version.txt)
+          echo "Current PREDBAT_VERSION: $current"
+          echo "current_version=$current" >> "$GITHUB_OUTPUT"
+
+      - name: Set env (PREDBAT_VERSION, IMAGE, REGISTRY)
+        if: steps.get_latest.outputs.predbat_version != steps.get_current.outputs.current_version
+        run: |
+          echo "PREDBAT_VERSION=${{ steps.get_latest.outputs.predbat_version }}" >> "$GITHUB_ENV"
+          echo "REGISTRY=ghcr.io" >> "$GITHUB_ENV"
+          # Image will be ghcr.io/<owner>/predbat
+          echo "IMAGE=${{ github.repository_owner }}/predbat" >> "$GITHUB_ENV"
+
+      - name: Set up QEMU (for multi-arch)
+        if: steps.get_latest.outputs.predbat_version != steps.get_current.outputs.current_version
+        uses: docker/setup-qemu-action@v3
 
       - name: Set up Docker Buildx
+        if: steps.get_latest.outputs.predbat_version != steps.get_current.outputs.current_version
         uses: docker/setup-buildx-action@v3
 
       - name: Create local cache folders
+        if: steps.get_latest.outputs.predbat_version != steps.get_current.outputs.current_version
         run: |
           mkdir -p /tmp/.buildx-cache-noble
           mkdir -p /tmp/.buildx-cache-alpine
           mkdir -p /tmp/.buildx-cache-slim
 
-      - name: Log in to Docker Hub
-        run: echo "${{ secrets.DOCKERHUB_TOKEN }}" | docker login -u "${{ secrets.DOCKERHUB_USERNAME }}" --password-stdin
+      - name: Log in to GHCR
+        if: steps.get_latest.outputs.predbat_version != steps.get_current.outputs.current_version
+        run: |
+          echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u "${{ github.actor }}" --password-stdin
 
       - name: Build and push Noble image
+        if: steps.get_latest.outputs.predbat_version != steps.get_current.outputs.current_version
         run: |
           docker buildx build \
             --build-arg BUILD_DATE="$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
-            --build-arg PREDBAT_VERSION=$PREDBAT_VERSION \
+            --build-arg PREDBAT_VERSION="${PREDBAT_VERSION}" \
             --platform linux/amd64,linux/arm64,linux/arm/v7,linux/arm/v8 \
             --file ./predbat/Dockerfile.noble \
-            --tag $USER/predbat_addon:latest \
-            --tag $USER/predbat_addon:${PREDBAT_VERSION} \
+            --tag "${REGISTRY}/${IMAGE}:latest" \
+            --tag "${REGISTRY}/${IMAGE}:${PREDBAT_VERSION}" \
             --cache-from=type=local,src=/tmp/.buildx-cache-noble \
             --cache-to=type=local,dest=/tmp/.buildx-cache-noble \
             --push \
             ./predbat/
 
-      - name: Build and push alpine image
+      - name: Build and push alpine image 
+        if: steps.get_latest.outputs.predbat_version != steps.get_current.outputs.current_version
         run: |
           docker buildx build \
             --build-arg BUILD_DATE="$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
-            --build-arg PREDBAT_VERSION=$PREDBAT_VERSION \
+            --build-arg PREDBAT_VERSION="${PREDBAT_VERSION}" \
             --platform linux/amd64,linux/arm64,linux/arm/v7,linux/arm/v8 \
             --file ./predbat/Dockerfile.alpine \
-            --tag $USER/predbat_addon:alpine-latest \
-            --tag $USER/predbat_addon:alpine-${PREDBAT_VERSION} \
+            --tag "${REGISTRY}/${IMAGE}:alpine-latest" \
+            --tag "${REGISTRY}/${IMAGE}:alpine-${PREDBAT_VERSION}" \
             --cache-from=type=local,src=/tmp/.buildx-cache-alpine \
             --cache-to=type=local,dest=/tmp/.buildx-cache-alpine \
             --push \
             ./predbat/
 
-      - name: Build and push slim image
+      - name: Build and push slim image 
+        if: steps.get_latest.outputs.predbat_version != steps.get_current.outputs.current_version
         run: |
           docker buildx build \
             --build-arg BUILD_DATE="$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
-            --build-arg PREDBAT_VERSION=$PREDBAT_VERSION \
+            --build-arg PREDBAT_VERSION="${PREDBAT_VERSION}" \
             --platform linux/amd64,linux/arm64,linux/arm/v7,linux/arm/v8 \
             --file ./predbat/Dockerfile.slim \
-            --tag $USER/predbat_addon:slim-latest \
-            --tag $USER/predbat_addon:slim-${PREDBAT_VERSION} \
+            --tag "${REGISTRY}/${IMAGE}:slim-latest" \
+            --tag "${REGISTRY}/${IMAGE}:slim-${PREDBAT_VERSION}" \
             --cache-from=type=local,src=/tmp/.buildx-cache-slim \
             --cache-to=type=local,dest=/tmp/.buildx-cache-slim \
             --push \
             ./predbat/
 
-      - name: Create GitHub Release
-        uses: softprops/action-gh-release@v2
+      - name: Compare versions and update if necessary
+        if: steps.get_latest.outputs.predbat_version != steps.get_current.outputs.current_version
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          new_version="${{ steps.get_latest.outputs.predbat_version }}"
+          echo "Updating PREDBAT_VERSION to $new_version"
+
+          git config user.name "github-actions"
+          git config user.email "github-actions@github.com"
+          git remote set-url origin https://x-access-token:${GITHUB_TOKEN}@github.com/${{ github.repository }}.git
+
+          git fetch origin
+          git pull --rebase origin main
+
+          echo "$new_version" > predbat_version.txt
+          sed -i "s/appVersion:.*/appVersion: \"${new_version}\"" charts/predbat/Chart.yaml
+
+          git add predbat_version.txt charts/predbat/Chart.yaml
+          git commit -m "AUTOMATION: Update Predbat references to ${new_version}" || echo "No changes to commit"
+          git push origin HEAD
+      - name: Create release
+        if: steps.get_latest.outputs.predbat_version != steps.get_current.outputs.current_version
+        uses: softprops/action-gh-release@v1
         with:
-          tag_name: ${{ env.PREDBAT_VERSION }}
-          name: Based on Prebat Version ${{ env.PREDBAT_VERSION }}
-          body: |
-            🔧 Built with predbat version `${{ env.PREDBAT_VERSION }}`
+          tag_name: ${{ steps.get_latest.outputs.predbat_version }}
+          name: "🦇 Predbat Container Build for ${{ steps.get_latest.outputs.predbat_version }}"
+          body: "Automated build triggered by new upstream Predbat release ${{ steps.get_latest.outputs.predbat_version }}. Download with docker pull ghcr.io/edhull/predbat:${{ steps.get_latest.outputs.predbat_version }} or ghcr.io/edhull/predbat:slim-${{ steps.get_latest.outputs.predbat_version }}."
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

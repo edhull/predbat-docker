@@ -1,0 +1,12 @@
+apiVersion: v2
+name: predbat
+home: https://github.com/edhull/predbat-docker
+description: A Helm chart for running predbat in Kubernetes
+keywords:
+- home-assistant
+- hass
+- homeassistant
+- predbat
+type: application
+version: 0.1.0
+appVersion: "v8.24.1"

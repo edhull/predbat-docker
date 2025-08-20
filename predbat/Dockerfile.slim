@@ -1,20 +1,38 @@
-ARG BASE_IMAGE="python:3.13-slim-bookworm"
+# syntax=docker/dockerfile:1
+
+ARG BASE_IMAGE="python:3.11-slim-bookworm"
+
+FROM scratch AS src
+ARG PREDBAT_VERSION
+ADD https://github.com/springfall2008/batpred.git#${PREDBAT_VERSION} /src/
+
 # Use the official lightweight Python base image
 FROM ${BASE_IMAGE} AS builder
+ARG PREDBAT_VERSION
+ARG TARGETARCH
 
-# Set the working directory
+# Keep pip fast & quiet-ish
+ENV PIP_DISABLE_PIP_VERSION_CHECK=1 \
+    PIP_DEFAULT_TIMEOUT=120 \
+    PIP_NO_CACHE_DIR=1
 
 WORKDIR /install
 
-
-# Install gcc and build python requirements && remove all cached and uneeded files/packages
-COPY requirements.txt /
-RUN <<EOF
+# Install gcc and build python requirements, preferring wheels.
+# Use piwheels on armv7 (TARGETARCH=arm), PyPI otherwise.
+COPY --from=src /src/requirements.txt /requirements.txt
+RUN <<'EOF'
+set -e
 apt-get update
 apt-get install --yes --no-install-recommends gcc g++ libffi-dev
-# Install Python packages
-pip install --no-cache-dir --prefix=/install -r /requirements.txt
-apt-get purge --yes gcc g++ libff1-dev
+python -m pip install --upgrade pip
+if [ "$TARGETARCH" = "arm" ]; then
+  export PIP_INDEX_URL="https://www.piwheels.org/simple"
+else
+  export PIP_INDEX_URL="https://pypi.org/simple"
+fi
+pip install --prefer-binary --no-cache-dir --prefix=/install -r /requirements.txt
+apt-get purge --yes gcc g++ libffi-dev
 apt-get autoremove --yes
 rm -rf /var/lib/apt/lists/* /requirements.txt
 EOF
@@ -28,34 +46,40 @@ ARG GID="9005"
 ARG PREDBAT_VERSION
 ARG BASE_IMAGE
 ARG BUILD_DATE
+
 # Set the working directory
 WORKDIR /config
 
-RUN addgroup -gid ${GID} ${USER_GROUP} \
-    && adduser -uid ${UID} -gid ${GID} ${USER_NAME} \
-    && chown -R ${USER_NAME} /config
+# Create user/group (Debian/Bookworm)
+RUN addgroup --gid ${GID} ${USER_GROUP} \
+ && adduser  --uid ${UID} --gid ${GID} --disabled-password --gecos "" ${USER_NAME} \
+ && chown -R ${USER_NAME}:${USER_GROUP} /config
 
 USER root
 
 # Copy only the necessary files from the builder stage
-# Copy Python packages from the builder stage
 COPY --from=builder /install /usr/local/
 
-# Copy required files including requirements file and install build dependencies
-ADD --chown=${USER_NAME} https://github.com/springfall2008/batpred.git#$PREDBAT_VERSION:apps/predbat/ https://github.com/springfall2008/batpred.git#$PREDBAT_VERSION:apps/predbat/config/ rootfs/alpine/* /addon/
+# Bring in app code + your local rootfs content
+ADD --chown=${USER_NAME} \
+  https://github.com/springfall2008/batpred.git#${PREDBAT_VERSION}:apps/predbat/ \
+  https://github.com/springfall2008/batpred.git#${PREDBAT_VERSION}:apps/predbat/config/ \
+  rootfs/alpine/ \
+  /addon/
+
 RUN chmod +x /addon/run.standalone.sh
 USER root
-# Define build arguments and labels
 
+# Define build arguments and labels
 LABEL \
     io.hass.type="addon" \
-    addon.version="1.2.9" \
-    maintainer="nipar4 (https://github.com/nipar4/predbat_addon)" \
+    addon.version=${PREDBAT_VERSION} \
+    maintainer="edhull (https://github.com/edhull/predbat-docker)" \
     org.opencontainers.image.vendor="Springfall2008" \
-    org.opencontainers.image.authors="springfall2008, nipar4" \
+    org.opencontainers.image.authors="springfall2008, edhull" \
     org.opencontainers.image.licenses="MIT" \
-    org.opencontainers.image.url="https://github.com/springfall2008, https://github.com/nipar4/predbat_addon" \
-    org.opencontainers.image.source="https://github.com/nipar4/predbat_addon" \
+    org.opencontainers.image.url="https://github.com/springfall2008, https://github.com/edhull/predbat-docker" \
+    org.opencontainers.image.source="https://github.com/edhull/predbat-docker" \
     org.opencontainers.image.documentation="https://github.com/springfall2008/predbat_addon/blob/main/predbat/DOCS.md" \
     org.opencontainers.image.created=${BUILD_DATE} \
     org.opencontainers.image.title="Predbat Addon Docker version" \

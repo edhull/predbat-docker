@@ -1,11 +1,16 @@
-ARG BASE_IMAGE="python:3.13-alpine"
+ARG BASE_IMAGE="python:3.11-alpine"
+FROM scratch AS src
+ARG PREDBAT_VERSION
+ADD https://github.com/springfall2008/batpred.git#${PREDBAT_VERSION} /src/
+
 # Use the official lightweight Python base image
 FROM ${BASE_IMAGE} AS builder
+ARG PREDBAT_VERSION
 # Set the working directory
 WORKDIR /install
 
 # Install gcc and build python requirements && remove all cached and uneeded files/packages
-COPY requirements.txt /
+COPY --from=src /src/requirements.txt /requirements.txt
 RUN <<EOF
 apk add --no-cache --virtual .build-deps gcc g++ libffi-dev musl-dev
 pip install --no-cache-dir --prefix=/install -r /requirements.txt
@@ -40,13 +45,13 @@ USER root
 # Define build arguments and labels
 LABEL \
     io.hass.type="addon" \
-    addon.version="1.2.9" \
-    maintainer="nipar4 (https://github.com/nipar4/predbat_addon)" \
+    addon.version=${PREDBAT_VERSION} \
+    maintainer="edhull (https://github.com/edhull/predbat-docker)" \
     org.opencontainers.image.vendor="Springfall2008" \
-    org.opencontainers.image.authors="springfall2008, nipar4" \
+    org.opencontainers.image.authors="springfall2008, edhull" \
     org.opencontainers.image.licenses="MIT" \
-    org.opencontainers.image.url="https://github.com/springfall2008, https://github.com/nipar4/predbat_addon" \
-    org.opencontainers.image.source="https://github.com/nipar4/predbat_addon" \
+    org.opencontainers.image.url="https://github.com/springfall2008, https://github.com/edhull/predbat-docker" \
+    org.opencontainers.image.source="https://github.com/edhull/predbat-docker" \
     org.opencontainers.image.documentation="https://github.com/springfall2008/predbat_addon/blob/main/predbat/DOCS.md" \
     org.opencontainers.image.created=${BUILD_DATE} \
     org.opencontainers.image.title="Predbat Addon Docker version" \
