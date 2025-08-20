@@ -8,6 +8,18 @@ This image is particularly suited to those who are running Home Assistant in a c
 
 The builds are hosted in the Github container registry, available for anyone and are created using the appropriate `dockerfile.OS` for each distribution.
 
+## TLDR
+
+```bash
+docker run -d --name predbat \
+  -v /path/to/local/config:/config \
+  -v /etc/localtime:/etc/localtime \
+  ghcr.io/edhull/predbat:latest
+```
+where /path/to/local/config contains a valid apps.yaml file appropriate for your inverter/battery.
+
+Example apps.yaml configuration can be found at https://github.com/springfall2008/batpred/tree/main/templates
+
 ---
 
 ## Available Builds and Linux Distributions
