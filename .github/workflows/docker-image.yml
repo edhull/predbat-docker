@@ -46,48 +46,27 @@ jobs:
             echo "should_build=false" >> "$GITHUB_OUTPUT"
           fi
 
-      - name: Update repo files (version + Helm) and push
-        if: steps.decide.outputs.should_build == 'true'
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          new_version="${{ steps.get_latest.outputs.predbat_version }}"
-          git config user.name "github-actions"
-          git config user.email "github-actions@github.com"
-          git remote set-url origin https://x-access-token:${GITHUB_TOKEN}@github.com/${{ github.repository }}.git
-          git fetch origin
-          git pull --rebase origin main
-          echo "$new_version" > predbat_version.txt
-          sed -i "s/appVersion:.*/appVersion: \"${new_version}\"/" charts/predbat/Chart.yaml
-          git add predbat_version.txt charts/predbat/Chart.yaml
-          git commit -m "AUTOMATION: Update Predbat references to ${new_version}" || echo "No changes to commit"
-          git push origin HEAD
-
   build:
     name: Build ${{ matrix.variant }} on ${{ matrix.os }} for ${{ matrix.arch }}
     needs: [check-and-update]
     if: needs.check-and-update.outputs.should_build == 'true'
-
-    # Runner matrix 
-    runs-on: ${{ matrix.os }}
+    runs-on: ${{ matrix.os }} 
     strategy:
       fail-fast: false
       matrix:
         variant: [noble, alpine, slim]
+        arch: [amd64, arm64, v7]
         include:
-          # Native x86_64
-          - os: ubuntu-latest
-            arch: amd64
+          - arch: amd64
+            os: ubuntu-latest
             platform: linux/amd64
             qemu: false
-          # Native arm64
-          - os: ubuntu-22.04-arm
-            arch: arm64
+          - arch: arm64
+            os: ubuntu-22.04-arm
             platform: linux/arm64
             qemu: false
-          # arm/v7 via QEMU on ARM runner
-          - os: ubuntu-22.04-arm
-            arch: v7
+          - arch: v7
+            os: ubuntu-22.04-arm
             platform: linux/arm/v7
             qemu: true
 
@@ -100,43 +79,8 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      # Per-variant metadata (path + tag prefix)
-      - name: Compute variant metadata
-        id: meta
-        shell: bash
-        run: |
-          case "${{ matrix.variant }}" in
-            noble)
-              echo "dockerfile=predbat/Dockerfile.noble" >> "$GITHUB_OUTPUT"
-              echo "tag_prefix=" >> "$GITHUB_OUTPUT"
-              ;;
-            alpine)
-              echo "dockerfile=predbat/Dockerfile.alpine" >> "$GITHUB_OUTPUT"
-              echo "tag_prefix=alpine-" >> "$GITHUB_OUTPUT"
-              ;;
-            slim)
-              echo "dockerfile=predbat/Dockerfile.slim" >> "$GITHUB_OUTPUT"
-              echo "tag_prefix=slim-" >> "$GITHUB_OUTPUT"
-              ;;
-          esac
 
-      - name: Set up QEMU (only if needed)
-        if: matrix.qemu == true
-        uses: docker/setup-qemu-action@v3
-        with:
-          platforms: arm
-
-      - name: Set up Buildx
-        uses: docker/setup-buildx-action@v3
-
-      - name: Log in to GHCR
-        uses: docker/login-action@v3
-        with:
-          registry: ghcr.io
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Build & push (single-arch on native runner)
+      - name: Build container
         id: build
         uses: docker/build-push-action@v6
         with:
@@ -148,10 +92,8 @@ jobs:
           build-args: |
             BUILD_DATE=${{ github.event.repository.pushed_at || '1970-01-01T00:00:00Z' }}
             PREDBAT_VERSION=${{ env.PREDBAT_VERSION }}
-          # Tag the per-arch artifact, e.g. :alpine-1.2.3-amd64 / :1.2.3-arm64 / :slim-1.2.3-v7
           tags: |
-            ghcr.io/${{ env.IMAGE }}:${{ steps.meta.outputs.tag_prefix }}${{ env.PREDBAT_VERSION }}
-          # Dual cache: GHA + GHCR (distinct per variant+arch)
+            ghcr.io/${{ env.IMAGE }}:${{ steps.meta.outputs.tag_prefix }}${{ env.PREDBAT_VERSION }}-${{ matrix.arch }}
           cache-from: |
             type=gha
             type=registry,ref=ghcr.io/${{ env.IMAGE }}:cache-${{ matrix.variant }}-${{ matrix.arch }}
@@ -183,13 +125,9 @@ jobs:
 
           create_manifest () {
             local prefix="$1"    # "", "alpine-", or "slim-"
-            # Amend whatever architectures you actually built
             refs=()
-            # amd64
             refs+=( "${REGISTRY}/${IMAGE}:${prefix}${PREDBAT_VERSION}-amd64" )
-            # arm64
             refs+=( "${REGISTRY}/${IMAGE}:${prefix}${PREDBAT_VERSION}-arm64" )
-            # OPTIONAL: arm/v7 (remove if you didn't build it)
             refs+=( "${REGISTRY}/${IMAGE}:${prefix}${PREDBAT_VERSION}-v7" )
 
             docker manifest create ${REGISTRY}/${IMAGE}:${prefix}${PREDBAT_VERSION} "${refs[@]/#/--amend }"
@@ -215,6 +153,23 @@ jobs:
     if: needs.check-and-update.outputs.should_build == 'true'
     runs-on: ubuntu-latest
     steps:
+      - name: Update repo files (version + Helm) and push
+        if: needs.check-and-update.outputs.predbat_version == 'true'
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          new_version="${{ needs.check-and-update.outputs.predbat_version }}"
+          git config user.name "github-actions"
+          git config user.email "github-actions@github.com"
+          git remote set-url origin https://x-access-token:${GITHUB_TOKEN}@github.com/${{ github.repository }}.git
+          git fetch origin
+          git pull --rebase origin main
+          echo "$new_version" > predbat_version.txt
+          sed -i "s/appVersion:.*/appVersion: \"${new_version}\"/" charts/predbat/Chart.yaml
+          git add predbat_version.txt charts/predbat/Chart.yaml
+          git commit -m "AUTOMATION: Update Predbat references to ${new_version}" || echo "No changes to commit"
+          git push origin HEAD
+
       - name: Create release
         uses: softprops/action-gh-release@v2
         with:
