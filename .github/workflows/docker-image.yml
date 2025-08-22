@@ -2,7 +2,7 @@ name: Build and push container on new Predbat release
 
 on:
   schedule:
-    - cron: '0 0 * * *'  # midnight UTC daily
+    - cron: '0 0 * * *' 
   workflow_dispatch:
 
 permissions:
@@ -64,30 +64,32 @@ jobs:
           git push origin HEAD
 
   build:
-    name: Build ${{ matrix.variant }} for ${{ matrix.platform }}
+    name: Build ${{ matrix.variant }} on ${{ matrix.os }} for ${{ matrix.arch }}
     needs: [check-and-update]
     if: needs.check-and-update.outputs.should_build == 'true'
-    runs-on: ubuntu-latest
 
+    # Runner matrix 
+    runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
       matrix:
         variant: [noble, alpine, slim]
-        platform:
-          # keep in sync with your supported platforms
-          - linux/amd64
-          - linux/arm64
-          - linux/arm/v7
         include:
-          - variant: noble
-            dockerfile: predbat/Dockerfile.noble
-            tag_prefix: ''
-          - variant: alpine
-            dockerfile: predbat/Dockerfile.alpine
-            tag_prefix: 'alpine-'
-          - variant: slim
-            dockerfile: predbat/Dockerfile.slim
-            tag_prefix: 'slim-'
+          # Native x86_64
+          - os: ubuntu-latest
+            arch: amd64
+            platform: linux/amd64
+            qemu: false
+          # Native arm64
+          - os: ubuntu-22.04-arm
+            arch: arm64
+            platform: linux/arm64
+            qemu: false
+          # arm/v7 via QEMU on ARM runner
+          - os: ubuntu-22.04-arm
+            arch: v7
+            platform: linux/arm/v7
+            qemu: true
 
     env:
       REGISTRY: ghcr.io
@@ -98,10 +100,31 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Set up QEMU
+      # Per-variant metadata (path + tag prefix)
+      - name: Compute variant metadata
+        id: meta
+        shell: bash
+        run: |
+          case "${{ matrix.variant }}" in
+            noble)
+              echo "dockerfile=predbat/Dockerfile.noble" >> "$GITHUB_OUTPUT"
+              echo "tag_prefix=" >> "$GITHUB_OUTPUT"
+              ;;
+            alpine)
+              echo "dockerfile=predbat/Dockerfile.alpine" >> "$GITHUB_OUTPUT"
+              echo "tag_prefix=alpine-" >> "$GITHUB_OUTPUT"
+              ;;
+            slim)
+              echo "dockerfile=predbat/Dockerfile.slim" >> "$GITHUB_OUTPUT"
+              echo "tag_prefix=slim-" >> "$GITHUB_OUTPUT"
+              ;;
+          esac
+
+      - name: Set up QEMU (only if needed)
+        if: matrix.qemu == true
         uses: docker/setup-qemu-action@v3
         with:
-          platforms: all
+          platforms: arm
 
       - name: Set up Buildx
         uses: docker/setup-buildx-action@v3
@@ -113,22 +136,28 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Build & push (single-arch)
+      - name: Build & push (single-arch on native runner)
         id: build
         uses: docker/build-push-action@v6
         with:
           context: ./predbat
-          file: ./${{ matrix.dockerfile }}
+          file: ./${{ steps.meta.outputs.dockerfile }}
           platforms: ${{ matrix.platform }}
           push: true
           provenance: false
           build-args: |
             BUILD_DATE=${{ github.event.repository.pushed_at || '1970-01-01T00:00:00Z' }}
             PREDBAT_VERSION=${{ env.PREDBAT_VERSION }}
+          # Tag the per-arch artifact, e.g. :alpine-1.2.3-amd64 / :1.2.3-arm64 / :slim-1.2.3-v7
           tags: |
-            ghcr.io/${{ env.IMAGE }}:${{ matrix.tag_prefix }}${{ env.PREDBAT_VERSION }}-${{ matrix.platform##*/ }}
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
+            ghcr.io/${{ env.IMAGE }}:${{ steps.meta.outputs.tag_prefix }}${{ env.PREDBAT_VERSION }}
+          # Dual cache: GHA + GHCR (distinct per variant+arch)
+          cache-from: |
+            type=gha
+            type=registry,ref=ghcr.io/${{ env.IMAGE }}:cache-${{ matrix.variant }}-${{ matrix.arch }}
+          cache-to: |
+            type=gha,mode=max
+            type=registry,ref=ghcr.io/${{ env.IMAGE }}:cache-${{ matrix.variant }}-${{ matrix.arch }},mode=max,image-manifest=true
 
   manifest:
     name: Create multi-arch manifests
@@ -148,34 +177,34 @@ jobs:
           password: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Create manifests for each variant
+        shell: bash
         run: |
           set -euo pipefail
+
           create_manifest () {
             local prefix="$1"    # "", "alpine-", or "slim-"
-            # Arch-tagged images produced by matrix:
-            # e.g. :<prefix><version>-amd64, -arm64, -v7
-            docker manifest create ${REGISTRY}/${IMAGE}:${prefix}${PREDBAT_VERSION} \
-              --amend ${REGISTRY}/${IMAGE}:${prefix}${PREDBAT_VERSION}-amd64 \
-              --amend ${REGISTRY}/${IMAGE}:${prefix}${PREDBAT_VERSION}-arm64 \
-              --amend ${REGISTRY}/${IMAGE}:${prefix}${PREDBAT_VERSION}-v7
+            # Amend whatever architectures you actually built
+            refs=()
+            # amd64
+            refs+=( "${REGISTRY}/${IMAGE}:${prefix}${PREDBAT_VERSION}-amd64" )
+            # arm64
+            refs+=( "${REGISTRY}/${IMAGE}:${prefix}${PREDBAT_VERSION}-arm64" )
+            # OPTIONAL: arm/v7 (remove if you didn't build it)
+            refs+=( "${REGISTRY}/${IMAGE}:${prefix}${PREDBAT_VERSION}-v7" )
 
-            docker manifest push ${REGISTRY}/${IMAGE}:${prefix}${PREDBAT_VERSION}
+            docker manifest create ${REGISTRY}/${IMAGE}:${prefix}${PREDBAT_VERSION} "${refs[@]/#/--amend }"
+            docker manifest push   ${REGISTRY}/${IMAGE}:${prefix}${PREDBAT_VERSION}
 
-            # Also roll "latest"/"<variant>-latest" lightweight tags
+            # Roll "latest" tags for convenience
             if [ -z "$prefix" ]; then
-              docker manifest create ${REGISTRY}/${IMAGE}:latest \
-                --amend ${REGISTRY}/${IMAGE}:${prefix}${PREDBAT_VERSION}-amd64 \
-                --amend ${REGISTRY}/${IMAGE}:${prefix}${PREDBAT_VERSION}-arm64 \
-                --amend ${REGISTRY}/${IMAGE}:${prefix}${PREDBAT_VERSION}-v7
-              docker manifest push ${REGISTRY}/${IMAGE}:latest
+              docker manifest create ${REGISTRY}/${IMAGE}:latest "${refs[@]/#/--amend }"
+              docker manifest push   ${REGISTRY}/${IMAGE}:latest
             else
-              docker manifest create ${REGISTRY}/${IMAGE}:${prefix}latest \
-                --amend ${REGISTRY}/${IMAGE}:${prefix}${PREDBAT_VERSION}-amd64 \
-                --amend ${REGISTRY}/${IMAGE}:${prefix}${PREDBAT_VERSION}-arm64 \
-                --amend ${REGISTRY}/${IMAGE}:${prefix}${PREDBAT_VERSION}-v7
-              docker manifest push ${REGISTRY}/${IMAGE}:${prefix}latest
+              docker manifest create ${REGISTRY}/${IMAGE}:${prefix}latest "${refs[@]/#/--amend }"
+              docker manifest push   ${REGISTRY}/${IMAGE}:${prefix}latest
             fi
           }
+
           create_manifest ""
           create_manifest "alpine-"
           create_manifest "slim-"

@@ -4,9 +4,11 @@
 
 This repository builds on the fantastic work of [nipar44](https://hub.docker.com/r/nipar44/predbat_addon) and automates the build/push of container builds of Predbat as they are released.
 
-This image is particularly suited to those who are running Home Assistant in a container and cannot natively install Predbat as an addon. An optional Predbat helm chart is also provided for those looking to deploy Predbat alongside Home Assistant in a kubernetes cluster.
+This image is particularly suited to those who are running Home Assistant in a container and cannot natively install Predbat as an addon. An optional Predbat helm chart is also provided for those looking to deploy Predbat alongside an existing Home Assistant deployment in a kubernetes cluster.
 
 The builds are hosted in the Github container registry, available for anyone and are created using the appropriate `dockerfile.OS` for each distribution.
+
+All credit for the [predbat & predbat_addon](https://github.com/springfall2008/batpred) goes to Trefor Southwell
 
 ## TLDR
 
@@ -16,7 +18,7 @@ docker run -d --name predbat \
   -v /etc/localtime:/etc/localtime \
   ghcr.io/edhull/predbat:latest
 ```
-where /path/to/local/config contains a valid apps.yaml file appropriate for your inverter/battery.
+...where /path/to/local/config contains a valid apps.yaml file appropriate for your inverter/battery.
 
 Example apps.yaml configuration can be found at https://github.com/springfall2008/batpred/tree/main/templates
 
