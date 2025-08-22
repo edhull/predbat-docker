@@ -45,23 +45,6 @@ jobs:
             echo "should_build=false" >> "$GITHUB_OUTPUT"
           fi
 
-      - name: Update repo files (version + Helm) and push
-        if: steps.decide.outputs.should_build == 'true'
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          new_version="${{ steps.get_latest.outputs.predbat_version }}"
-          git config user.name "github-actions"
-          git config user.email "github-actions@github.com"
-          git remote set-url origin https://x-access-token:${GITHUB_TOKEN}@github.com/${{ github.repository }}.git
-          git fetch origin
-          git pull --rebase origin main
-          echo "$new_version" > predbat_version.txt
-          sed -i "s/appVersion:.*/appVersion: \"${new_version}\"/" charts/predbat/Chart.yaml
-          git add predbat_version.txt charts/predbat/Chart.yaml
-          git commit -m "AUTOMATION: Update Predbat references to ${new_version}" || echo "No changes to commit"
-          git push origin HEAD
-
   build:
     name: ${{ matrix.arch }}/${{ matrix.os }}/${{ matrix.variant }}
     needs: [check-and-update]
@@ -208,6 +191,21 @@ jobs:
     if: needs.check-and-update.outputs.should_build == 'true'
     runs-on: ubuntu-latest
     steps:
+      - name: Update repo files (version + Helm) and push
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          new_version="${{ needs.check-and-update.outputs.predbat_version }}"
+          git config user.name "github-actions"
+          git config user.email "github-actions@github.com"
+          git remote set-url origin https://x-access-token:${GITHUB_TOKEN}@github.com/${{ github.repository }}.git
+          git fetch origin
+          git pull --rebase origin main
+          echo "$new_version" > predbat_version.txt
+          sed -i "s/appVersion:.*/appVersion: \"${new_version}\"/" charts/predbat/Chart.yaml
+          git add predbat_version.txt charts/predbat/Chart.yaml
+          git commit -m "AUTOMATION: Update Predbat references to ${new_version}" || echo "No changes to commit"
+          git push origin HEAD
       - name: Create release
         uses: softprops/action-gh-release@v2
         with:
