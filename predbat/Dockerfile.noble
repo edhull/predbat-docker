@@ -24,14 +24,7 @@ RUN apt-get update && apt-get upgrade -y && \
     apt-get install -y python3-pip python3-dev build-essential pkg-config libjpeg-dev zlib1g-dev libpng-dev libtiff-dev libgif-dev 
 RUN apt-get clean && \
     rm -rf /var/lib/apt/lists/*
-RUN --mount=type=cache,target=/root/.cache/pip \
-    python3 -m pip install --upgrade pip wheel setuptools && \
-    if [ "$TARGETARCH" = "arm" ]; then \
-        export PIP_INDEX_URL="https://www.piwheels.org/simple" \
-    else \
-        export PIP_INDEX_URL="https://pypi.org/simple" \
-    fi && \
-    pip install --break-system-packages -r /requirements.txt 
+RUN pip install --break-system-packages -r /requirements.txt 
 
 # Set the working directory
 WORKDIR /config
