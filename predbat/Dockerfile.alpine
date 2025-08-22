@@ -1,5 +1,5 @@
 # syntax=docker/dockerfile:1.7
-ARG BASE_IMAGE="python:3.11-alpine"
+ARG BASE_IMAGE="python:3.13-alpine"
 FROM scratch AS src
 ARG PREDBAT_VERSION
 ADD https://github.com/springfall2008/batpred.git#${PREDBAT_VERSION} /src/
@@ -13,9 +13,7 @@ WORKDIR /install
 # Install gcc and build python requirements && remove all cached and uneeded files/packages
 COPY --from=src /src/requirements.txt /requirements.txt
 RUN <<EOF 
-apk add --no-cache --virtual .build-deps gcc g++ build-base linux-headers pkgconf python3-dev zlib-dev jpeg-dev libpng-dev tiff-dev webp-dev freetype-dev lcms2-dev openjpeg-dev harfbuzz-dev fribidi-dev
-apk add --no-cache python3 py3-pip python3-dev build-base pkgconf
-pip install --upgrade pip wheel setuptools 
+apk add --no-cache --virtual .build-deps gcc g++ libffi-dev musl-dev
 pip install --no-cache-dir --prefix=/install -r /requirements.txt
 apk del .build-deps
 echo "Cleaning Up"

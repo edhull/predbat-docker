@@ -1,6 +1,6 @@
 # syntax=docker/dockerfile:1.7
 
-ARG BASE_IMAGE="python:3.11-slim-bookworm"
+ARG BASE_IMAGE="python:3.13-slim-bookworm"
 
 FROM scratch AS src
 ARG PREDBAT_VERSION
@@ -24,14 +24,8 @@ COPY --from=src /src/requirements.txt /requirements.txt
 RUN <<'EOF'
 set -e
 apt-get update
-apt-get install --yes --no-install-recommends gcc g++ libffi-dev gcc zlib1g-dev libjpeg-dev
-python -m pip install --upgrade pip
-if [ "$TARGETARCH" = "arm" ]; then
-  export PIP_INDEX_URL="https://www.piwheels.org/simple"
-else
-  export PIP_INDEX_URL="https://pypi.org/simple"
-fi
-pip install --prefer-binary --no-cache-dir --prefix=/install -r /requirements.txt
+apt-get install --yes --no-install-recommends gcc g++ libffi-dev zlib1g-dev libjpeg-dev
+pip install --no-cache-dir --prefix=/install -r /requirements.txt
 apt-get purge --yes gcc g++ libffi-dev
 apt-get autoremove --yes
 rm -rf /var/lib/apt/lists/* /requirements.txt
