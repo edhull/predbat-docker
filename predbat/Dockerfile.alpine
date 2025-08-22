@@ -13,7 +13,7 @@ WORKDIR /install
 # Install gcc and build python requirements && remove all cached and uneeded files/packages
 COPY --from=src /src/requirements.txt /requirements.txt
 RUN <<EOF 
-apk add --no-cache --virtual .build-deps gcc g++ libffi-dev musl-dev
+apk add --no-cache --virtual .build-deps build-base linux-headers pkgconf zlib-dev libjpeg-turbo-dev libpng-dev tiff-dev webp-dev freetype-dev lcms2-dev openjpeg-dev harfbuzz-dev fribidi-dev 
 pip install --no-cache-dir --prefix=/install -r /requirements.txt
 apk del .build-deps
 echo "Cleaning Up"
