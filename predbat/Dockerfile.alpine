@@ -13,11 +13,15 @@ WORKDIR /install
 # Install gcc and build python requirements && remove all cached and uneeded files/packages
 COPY --from=src /src/requirements.txt /requirements.txt
 RUN <<EOF 
-apk add --no-cache --virtual .build-deps gcc gcc++ build-base linux-headers pkgconf zlib-dev libjpeg-turbo-dev libpng-dev tiff-dev webp-dev freetype-dev lcms2-dev openjpeg-dev harfbuzz-dev fribidi-dev 
+set -e
+apk add --no-cache --virtual .build-deps \
+  gcc g++ musl-dev linux-headers \
+  pkgconf zlib-dev libjpeg-turbo-dev libpng-dev tiff-dev \
+  libwebp-dev freetype-dev lcms2-dev openjpeg-dev \
+  harfbuzz-dev fribidi-dev cairo-dev pango-dev \
+  python3-dev py3-pip py3-setuptools py3-wheel py3-numpy meson ninja
+
 pip install --no-cache-dir --prefix=/install -r /requirements.txt
-apk del .build-deps
-echo "Cleaning Up"
-rm -rf /var/cache/apk/* /requirements.txt
 EOF
 #RUN find /usr /install -type d -name "__pycache__" -exec sh -c 'echo "Deleting: {}"; rm -rf {}' \;
 
