@@ -148,6 +148,7 @@ jobs:
     needs: [check-and-update, manifest]
     runs-on: ubuntu-latest
     steps:
+      - uses: actions/checkout@v4
       - name: Update repo files (version + Helm) and push
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
