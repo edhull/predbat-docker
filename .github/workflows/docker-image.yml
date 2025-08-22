@@ -92,34 +92,27 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Build & push ${{ matrix.variant }}
+      - name: Build and push ${{ matrix.variant }} image
         id: build
-        uses: docker/build-push-action@v6
-        with:
-          context: ./predbat
-          file: ./${{ matrix.dockerfile }}
-          platforms: "linux/amd64,linux/arm64,linux/arm/v7,linux/arm/v8"
-          push: true
-          provenance: false
-          build-args: |
-            BUILD_DATE=${{ github.event.repository.pushed_at || '1970-01-01T00:00:00Z' }}
-            PREDBAT_VERSION=${{ env.PREDBAT_VERSION }}
-          tags: |
-            ghcr.io/${{ env.IMAGE }}:${{ matrix.tag_prefix }}latest
-            ghcr.io/${{ env.IMAGE }}:${{ matrix.tag_prefix }}${{ env.PREDBAT_VERSION }}
-          cache-from: |
-            type=gha
-            type=registry,ref=ghcr.io/${{ env.IMAGE }}:cache-${{ matrix.variant }}
-          cache-to: |
-            type=gha,mode=max
-            type=registry,ref=ghcr.io/${{ env.IMAGE }}:cache-${{ matrix.variant }},mode=max,image-manifest=true
+        run: |
+          docker buildx build \
+            --build-arg BUILD_DATE="$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
+            --build-arg PREDBAT_VERSION=$PREDBAT_VERSION \
+            --platform linux/amd64,linux/arm64,linux/arm/v7,linux/arm/v8 \
+            --file ./${{ matrix.dockerfile }} \
+            --tag ghcr.io/${{ env.IMAGE }}:${{ matrix.tag_prefix }}latest \
+            --tag ghcr.io/${{ env.IMAGE }}:${{ matrix.tag_prefix }}${{ env.PREDBAT_VERSION }} \
+            --cache-from=type=registry,ref=ghcr.io/${{ env.IMAGE }}:cache-${{ matrix.variant }} \
+            --cache-to=type=registry,ref=ghcr.io/${{ env.IMAGE }}:cache-${{ matrix.variant }},mode=max,image-manifest=true \
+            --push \
+            ./predbat/
 
       - name: Inspect pushed image
         run: docker buildx imagetools inspect ghcr.io/${{ env.IMAGE }}:${{ matrix.tag_prefix }}${{ env.PREDBAT_VERSION }}
 
   release:
     name: Create GitHub Release
-    needs: [check-and-update]
+    needs: [check-and-update, build]
     if: needs.check-and-update.outputs.should_build == 'true'
     runs-on: ubuntu-latest
     steps:
