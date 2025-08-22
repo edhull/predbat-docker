@@ -24,7 +24,7 @@ COPY --from=src /src/requirements.txt /requirements.txt
 RUN <<'EOF'
 set -e
 apt-get update
-apt-get install --yes --no-install-recommends gcc g++ libffi-dev
+apt-get install --yes --no-install-recommends gcc g++ libffi-dev gcc zlib1g-dev libjpeg-dev
 python -m pip install --upgrade pip
 if [ "$TARGETARCH" = "arm" ]; then
   export PIP_INDEX_URL="https://www.piwheels.org/simple"
