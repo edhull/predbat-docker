@@ -140,7 +140,7 @@ jobs:
             docker manifest create ghcr.io/${{ github.repository_owner }}/predbat:${variant}v8.24.2 "${refs[@]}"
             docker manifest push ghcr.io/${{ github.repository_owner }}/predbat:${variant}v8.24.2
 
-            docker manifest createghcr.io/${{ github.repository_owner }}/predbat:${variant}latest "${refs[@]}"
+            docker manifest create ghcr.io/${{ github.repository_owner }}/predbat:${variant}latest "${refs[@]}"
             docker manifest push ghcr.io/${{ github.repository_owner }}/predbat:${variant}latest
           done
   release:
