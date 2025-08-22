@@ -162,25 +162,39 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
+
           create_manifest () {
             local prefix="$1"    # "", "alpine-", or "slim-"
-            refs=()
-            refs+=( "${REGISTRY}/${IMAGE}:${prefix}${PREDBAT_VERSION}-amd64" )
-            refs+=( "${REGISTRY}/${IMAGE}:${prefix}${PREDBAT_VERSION}-arm64" )
-            # include v7 only if you built it:
-            refs+=( "${REGISTRY}/${IMAGE}:${prefix}${PREDBAT_VERSION}-v7" )
+            local target="${REGISTRY}/${IMAGE}:${prefix}${PREDBAT_VERSION}"
 
-            docker manifest create ${REGISTRY}/${IMAGE}:${prefix}${PREDBAT_VERSION} "${refs[@]/#/--amend }"
-            docker manifest push   ${REGISTRY}/${IMAGE}:${prefix}${PREDBAT_VERSION}
+            refs=()
+            for arch in amd64 arm64 v7; do
+              ref="${REGISTRY}/${IMAGE}:${prefix}${PREDBAT_VERSION}-${arch}"
+              if docker buildx imagetools inspect "$ref" >/dev/null 2>&1; then
+                echo "Including $ref"
+                refs+=("$ref")
+              else
+                echo "Skipping missing $ref"
+              fi
+            done
+
+            if [ ${#refs[@]} -eq 0 ]; then
+              echo "No arch images found for tag ${target}"
+              exit 1
+            fi
+
+            docker manifest create "$target" "${refs[@]}"
+            docker manifest push   "$target"
 
             if [ -z "$prefix" ]; then
-              docker manifest create ${REGISTRY}/${IMAGE}:latest "${refs[@]/#/--amend }"
-              docker manifest push   ${REGISTRY}/${IMAGE}:latest
+              latest="${REGISTRY}/${IMAGE}:latest"
             else
-              docker manifest create ${REGISTRY}/${IMAGE}:${prefix}latest "${refs[@]/#/--amend }"
-              docker manifest push   ${REGISTRY}/${IMAGE}:${prefix}latest
+              latest="${REGISTRY}/${IMAGE}:${prefix}latest"
             fi
+            docker manifest create "$latest" "${refs[@]}"
+            docker manifest push   "$latest"
           }
+
           create_manifest ""
           create_manifest "alpine-"
           create_manifest "slim-"
