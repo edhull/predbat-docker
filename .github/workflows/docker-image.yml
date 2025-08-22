@@ -134,14 +134,15 @@ jobs:
           for variant in "" "alpine-" "slim-"; do
             refs=()
             for arch in amd64 arm64 arm_v7; do
-              refs+=(ghcr.io/${{ github.repository_owner }}/predbat:${variant}${{ needs.check-and-update.outputs.predbat_version }}-$arch)
+              digest=$(docker buildx imagetools inspect ghcr.io/${{ github.repository_owner }}/predbat:${variant}${{ needs.check-and-update.outputs.predbat_version }}-$arch --format '{{ (index .Manifest.Manifests 0).Digest }}')
+              refs+=(ghcr.io/${{ github.repository_owner }}/predbat@${digest})
             done
-            docker manifest create ghcr.io/${{ github.repository_owner }}/predbat:${variant}${{ needs.check-and-update.outputs.predbat_version }} ${refs[@]}
-            docker manifest push ghcr.io/${{ github.repository_owner }}/predbat:${variant}${{ needs.check-and-update.outputs.predbat_version }}
-            docker manifest create ghcr.io/${{ github.repository_owner }}/predbat:${variant}latest ${refs[@]}
+            docker manifest create ghcr.io/${{ github.repository_owner }}/predbat:${variant}v8.24.2 "${refs[@]}"
+            docker manifest push ghcr.io/${{ github.repository_owner }}/predbat:${variant}v8.24.2
+
+            docker manifest createghcr.io/${{ github.repository_owner }}/predbat:${variant}latest "${refs[@]}"
             docker manifest push ghcr.io/${{ github.repository_owner }}/predbat:${variant}latest
           done
-
   release:
     name: Create GitHub Release
     needs: [check-and-update, manifest]
