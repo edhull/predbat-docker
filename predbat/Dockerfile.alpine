@@ -18,9 +18,11 @@ apk add --no-cache --virtual .build-deps \
   gcc g++ musl-dev linux-headers \
   pkgconf zlib-dev libjpeg-turbo-dev libpng-dev tiff-dev \
   libwebp-dev freetype-dev lcms2-dev openjpeg-dev \
-  harfbuzz-dev fribidi-dev cairo-dev pango-dev \
+  harfbuzz-dev fribidi-dev cairo-dev pango-dev openssl-dev \
   python3-dev py3-pip py3-setuptools py3-wheel py3-numpy meson ninja \
   rust cargo
+
+export OPENSSL_NO_VENDOR=1
 
 pip install --no-cache-dir --prefix=/install -r /requirements.txt
 EOF
