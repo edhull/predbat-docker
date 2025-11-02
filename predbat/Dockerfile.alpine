@@ -19,7 +19,12 @@ apk add --no-cache --virtual .build-deps \
   pkgconf zlib-dev libjpeg-turbo-dev libpng-dev tiff-dev \
   libwebp-dev freetype-dev lcms2-dev openjpeg-dev \
   harfbuzz-dev fribidi-dev cairo-dev pango-dev \
-  python3-dev py3-pip py3-setuptools py3-wheel py3-numpy meson ninja
+  python3-dev py3-pip py3-setuptools py3-wheel py3-numpy meson ninja \
+  rust cargo
+
+RUSTUP_HOME=/usr/local/rustup
+CARGO_HOME=/usr/local/cargo
+rustup target add armv7-unknown-linux-musleabihf
 
 pip install --no-cache-dir --prefix=/install -r /requirements.txt
 EOF
