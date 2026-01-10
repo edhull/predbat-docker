@@ -24,7 +24,6 @@ COPY --from=src /src/requirements.txt /requirements.txt
 RUN <<'EOF'
 set -e
 apt-get update
-apt-get upgrade -y
 apt-get install --yes --no-install-recommends gcc g++ libffi-dev zlib1g-dev libjpeg-dev
 pip install --no-cache-dir --prefix=/install -r /requirements.txt
 apt-get purge --yes gcc g++ libffi-dev
@@ -44,6 +43,15 @@ ARG BUILD_DATE
 
 # Set the working directory
 WORKDIR /config
+
+# Ensure final image has the latest available updates
+RUN <<'EOF'
+set -e
+apt-get update
+apt-get upgrade -y
+apt-get autoremove --yes
+rm -rf /var/lib/apt/lists/* 
+EOF
 
 # Create user/group (Debian/Bookworm)
 RUN addgroup --gid ${GID} ${USER_GROUP} \
