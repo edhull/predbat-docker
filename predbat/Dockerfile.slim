@@ -71,7 +71,7 @@ ADD --chown=${USER_NAME} \
   /addon/
 
 RUN chmod +x /addon/run.standalone.sh
-USER root
+USER ${USER_NAME}
 
 # Define build arguments and labels
 LABEL \

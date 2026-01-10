@@ -48,7 +48,7 @@ COPY --from=builder /install /usr/local/
 # Copy only the necessary files from github
 ADD --chown=${USER_NAME} https://github.com/springfall2008/batpred.git#$PREDBAT_VERSION:apps/predbat/ https://github.com/springfall2008/batpred.git#$PREDBAT_VERSION:apps/predbat/config/ rootfs/alpine/* /addon/
 RUN chmod +x /addon/run.standalone.sh
-USER root
+USER ${USER_NAME}
 
 # Define build arguments and labels
 LABEL \

@@ -35,7 +35,7 @@ RUN groupadd -g ${GID} ${USER_GROUP} \
 ADD --chown=${USER_NAME} https://github.com/springfall2008/batpred.git#$PREDBAT_VERSION:apps/predbat/ https://github.com/springfall2008/batpred.git#$PREDBAT_VERSION:apps/predbat/config/ rootfs/noble/* /addon/
 # Make the startup script executable
 RUN chmod +x /addon/run.standalone.sh
-USER root
+USER ${USER_NAME}
 
 # Define build arguments and labels
 LABEL \
