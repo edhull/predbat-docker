@@ -24,6 +24,7 @@ COPY --from=src /src/requirements.txt /requirements.txt
 RUN <<'EOF'
 set -e
 apt-get update
+apt-get upgrade -y
 apt-get install --yes --no-install-recommends gcc g++ libffi-dev zlib1g-dev libjpeg-dev
 pip install --no-cache-dir --prefix=/install -r /requirements.txt
 apt-get purge --yes gcc g++ libffi-dev
