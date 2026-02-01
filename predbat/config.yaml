@@ -19,10 +19,10 @@ hassio_role: admin
 auth_api: true
 map:
   - addon_config:rw
-  - homeassistant_config:rw
-  - media:rw
-  - share:rw
-  - ssl
+  # - homeassistant_config:rw
+  # - media:rw
+  # - share:rw
+  # - ssl
 options:
   dummy: []
 schema:
