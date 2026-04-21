@@ -15,7 +15,7 @@ COPY --from=src /src/requirements.txt /requirements.txt
 RUN <<EOF 
 set -e
 apk add --no-cache --virtual .build-deps \
-  gcc g++ musl-dev linux-headers \
+  gcc g++ musl-dev linux-headers gfortran \
   pkgconf zlib-dev libjpeg-turbo-dev libpng-dev tiff-dev \
   libwebp-dev freetype-dev lcms2-dev openjpeg-dev \
   harfbuzz-dev fribidi-dev cairo-dev pango-dev openssl-dev \
