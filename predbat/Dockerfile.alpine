@@ -20,7 +20,7 @@ apk add --no-cache --virtual .build-deps \
   libwebp-dev freetype-dev lcms2-dev openjpeg-dev \
   harfbuzz-dev fribidi-dev cairo-dev pango-dev openssl-dev \
   python3-dev py3-pip py3-setuptools py3-wheel py3-numpy meson ninja \
-  rust cargo openblas-dev
+  rust cargo openblas-dev hdf5-dev
 
 export OPENSSL_NO_VENDOR=1
 

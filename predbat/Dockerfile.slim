@@ -24,9 +24,9 @@ COPY --from=src /src/requirements.txt /requirements.txt
 RUN <<'EOF'
 set -e
 apt-get update
-apt-get install --yes --no-install-recommends gcc g++ libffi-dev zlib1g-dev pkg-config libblas-dev libopenblas-dev libjpeg-dev gfortran
+apt-get install --yes --no-install-recommends gcc g++ libffi-dev zlib1g-dev libhdf5-dev pkg-config libblas-dev libopenblas-dev libjpeg-dev gfortran
 pip install --no-cache-dir --prefix=/install -r /requirements.txt
-apt-get purge --yes gcc g++ libffi-dev gfortran pkg-config libblas-dev libopenblas-dev
+apt-get purge --yes gcc g++ libffi-dev gfortran pkg-config libblas-dev libopenblas-dev libhdf5-dev
 apt-get autoremove --yes
 rm -rf /var/lib/apt/lists/* /requirements.txt
 EOF
