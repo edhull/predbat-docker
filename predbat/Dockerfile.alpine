@@ -17,14 +17,14 @@ set -e
 apk add --no-cache --virtual .build-deps \
   gcc g++ musl-dev linux-headers gfortran \
   pkgconf zlib-dev libjpeg-turbo-dev libpng-dev tiff-dev \
-  libwebp-dev freetype-dev lcms2-dev openjpeg-dev \
+  libwebp-dev freetype-dev build-base lcms2-dev openjpeg-dev \
   harfbuzz-dev fribidi-dev cairo-dev pango-dev openssl-dev \
   python3-dev py3-pip py3-setuptools py3-wheel py3-numpy meson ninja \
-  rust cargo openblas-dev hdf5-dev
+  rust cargo openblas-dev hdf5-dev patch git jpeg-dev libffi-dev pkgconfig
 
 export OPENSSL_NO_VENDOR=1
 
-pip install --no-cache-dir --prefix=/install -r /requirements.txt
+pip install --no-cache-dir --prefix=/install --prefer-binary -r /requirements.txt
 EOF
 #RUN find /usr /install -type d -name "__pycache__" -exec sh -c 'echo "Deleting: {}"; rm -rf {}' \;
 
