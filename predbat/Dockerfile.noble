@@ -24,7 +24,7 @@ RUN apt-get update && apt-get upgrade -y && \
     apt-get install -y python3-pip python3-dev build-essential gfortran pkg-config libblas-dev libopenblas-dev libjpeg-dev zlib1g-dev libpng-dev libtiff-dev libgif-dev libffi-dev libhdf5-dev
 RUN apt-get clean && \
     rm -rf /var/lib/apt/lists/*
-RUN pip install --break-system-packages -r /requirements.txt 
+RUN pip install --ignore-installed --break-system-packages -r /requirements.txt 
 
 # Set the working directory
 WORKDIR /config
