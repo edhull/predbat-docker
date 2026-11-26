@@ -25,7 +25,7 @@ RUN <<'EOF'
 set -e
 apt-get update
 apt-get install --yes --no-install-recommends build-essential libfreetype6-dev libpng-dev gcc g++ libffi-dev zlib1g-dev libhdf5-dev pkg-config libblas-dev libopenblas-dev libjpeg-dev gfortran git patch 
-pip install --no-cache-dir --prefix=/install --prefer-binary -r /requirements.txt
+pip install --no-cache-dir --prefix=/install --prefer-binary -r /requirements.txt requests
 apt-get purge --yes gcc g++ libffi-dev gfortran pkg-config libblas-dev libopenblas-dev libhdf5-dev
 apt-get autoremove --yes
 rm -rf /var/lib/apt/lists/* /requirements.txt

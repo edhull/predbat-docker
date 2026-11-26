@@ -24,7 +24,7 @@ apk add --no-cache --virtual .build-deps \
 
 export OPENSSL_NO_VENDOR=1
 
-pip install --no-cache-dir --prefix=/install --prefer-binary -r /requirements.txt
+pip install --no-cache-dir --prefix=/install --prefer-binary -r /requirements.txt requests
 EOF
 #RUN find /usr /install -type d -name "__pycache__" -exec sh -c 'echo "Deleting: {}"; rm -rf {}' \;
 
